@@ -1,1362 +1,890 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="id">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Mod Portal</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script type="module">
-    // Firebase SDKs
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-    import { 
-      getAuth, 
-      onAuthStateChanged, 
-      signInWithEmailAndPassword, 
-      createUserWithEmailAndPassword, 
-      signOut,
-      updateEmail,
-      updatePassword,
-      reauthenticateWithCredential,
-      EmailAuthProvider,
-      signInAnonymously,
-      signInWithCustomToken 
-    } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-    import { 
-      getFirestore, 
-      collection, 
-      doc, 
-      getDoc, 
-      setDoc, 
-      addDoc, 
-      query, 
-      where, 
-      onSnapshot, 
-      serverTimestamp, 
-      deleteDoc,
-      updateDoc,
-      arrayUnion,
-      arrayRemove,
-      getDocs
-    } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-    // --- Global Variables (Canvas-provided, do not change) ---
-    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-    
-    // --- The Firebase configuration provided by the user ---
-    const firebaseConfig = {
-      apiKey: "AIzaSyDS4lE6XNKK_98l7nj807HzXc2WA4zUeHU",
-      authDomain: "coderedeemdriftjik.firebaseapp.com",
-      projectId: "coderedeemdriftjik",
-      storageBucket: "coderedeemdriftjik.appspot.com",
-      messagingSenderId: "106368540191",
-      appId: "1:106368540191:web:6674e3e46e8c5b9405bf2a",
-      measurementId: "G-0JDXJT6L42"
-    };
-
-    let __initial_auth_token = typeof window.__initial_auth_token !== 'undefined' ? window.__initial_auth_token : '';
-    
-    // Inisialisasi Firebase
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db = getFirestore(app);
-    let userId = null;
-
-    // --- UI State and Navigation ---
-    const pages = {
-      home: document.getElementById('homePage'),
-      login: document.getElementById('loginPage'),
-      register: document.getElementById('registerPage'),
-      upload: document.getElementById('uploadPage'),
-      myUploads: document.getElementById('myUploadsPage'),
-      profile: document.getElementById('profilePage'),
-      modDetailsModal: document.getElementById('modDetailsModal'),
-      notificationModal: document.getElementById('notificationModal'),
-      reportModal: document.getElementById('reportModal'),
-      downloadLater: document.getElementById('downloadLaterPage'),
-      favorites: document.getElementById('favoritesPage')
-    };
-
-    const navItems = {
-      home: document.getElementById('navHome'),
-      upload: document.getElementById('navUpload'),
-      profileDropdown: document.getElementById('profileDropdown')
-    };
-
-    const authItems = {
-      login: document.getElementById('navLogin'),
-      register: document.getElementById('navRegister'),
-      logout: document.getElementById('navLogout')
-    };
-
-    const searchInput = document.getElementById('searchInput');
-    const languageSelect = document.getElementById('languageSelect');
-    const notificationButton = document.getElementById('notificationButton');
-    const profileButton = document.getElementById('profileButton');
-    const profileDropdownMenu = document.getElementById('profileDropdownMenu');
-
-    let currentLanguage = 'id';
-    let allMods = [];
-
-    // --- Terjemahan Teks ---
-    const translations = {
-      en: {
-        home: "Home", uploadMods: "Upload Mods", myUploads: "My Uploads", profile: "Profile", login: "Login", register: "Register", logout: "Logout",
-        favorites: "Favorite Mods", downloadLater: "Download Later",
-        search: "Search for mods...",
-        newModsAvailable: "New mods are available!",
-        welcome: "Welcome to the Mod Portal!",
-        latestMods: "Latest Mods",
-        gameTitle: "Game Title", rules: "Upload Rules", filesLink: "Files (External Link)",
-        thumbnail: "Image Thumbnail URL", imageDetails: "Image Details URL", description: "Mod Description",
-        exclusive: "Exclusive Mod",
-        author: "I am the Author", matureContent: "18+ / Sensitive Content", submit: "Submit",
-        uploadSuccess: "Mod uploaded successfully! Awaiting review...",
-        yourUploads: "Your Uploads",
-        status: "Status", authorName: "Author",
-        pending: "Pending", approved: "Approved", rejected: "Rejected",
-        accountProfile: "Account Profile",
-        username: "Username", bio: "Bio", email: "Email", password: "Password",
-        updateProfile: "Update Profile", currentPassword: "Current Password", newPassword: "New Password",
-        modDetails: "Mod Details", close: "Close", download: "Download",
-        downloadStartsIn: "Download starts in...",
-        downloading: "Downloading...",
-        comments: "Comments", postComment: "Post Comment",
-        authorBadge: "Mod Author",
-        reportMod: "Report Mod", reportInstructions: "Paste the Mod ID to report:", submitReport: "Submit Report",
-        loginTitle: "Login to your account",
-        emailPlaceholder: "Email address", passwordPlaceholder: "Password",
-        noAccount: "Don't have an account?",
-        registerTitle: "Create a new account",
-        alreadyAccount: "Already have an account?",
-        myFriends: "My Friends",
-        noModsFound: "No mods found.",
-        modCategory: "Category",
-        tutorial: "Tutorial",
-        mod: "Mod",
-        modpack: "Modpack",
-        downloadGuide: "Download Guide",
-        downloadInstructions: "Instructions for downloading",
-        downloadingFile: "Downloading the file...",
-        error: "Error",
-        passwordMismatch: "New passwords do not match.",
-        reauthRequired: "Please re-authenticate to change email/password.",
-        reportSuccess: "Report submitted successfully.",
-        profileUpdateSuccess: "Profile updated successfully.",
-        noModsUploads: "You have not uploaded any mods yet.",
-        addToFavorites: "Add to Favorites",
-        removeFromFavorites: "Remove from Favorites",
-        addToDownloadLater: "Add to Download Later",
-        removeFromDownloadLater: "Remove from Download Later"
-      },
-      id: {
-        home: "Beranda", uploadMods: "Unggah Mod", myUploads: "Unggahan Saya", profile: "Profil", login: "Masuk", register: "Daftar", logout: "Keluar",
-        favorites: "Mod Favorit", downloadLater: "Unduh Nanti",
-        search: "Cari mod...",
-        newModsAvailable: "Mod baru tersedia!",
-        welcome: "Selamat datang di Portal Mod!",
-        latestMods: "Mod Terbaru",
-        gameTitle: "Judul Game", rules: "Aturan Unggah", filesLink: "Tautan Berkas (Eksternal)",
-        thumbnail: "URL Gambar Thumbnail", imageDetails: "URL Gambar Detail", description: "Deskripsi Mod",
-        exclusive: "Mod Eksklusif",
-        author: "Saya adalah Penulis", matureContent: "18+ / Konten Sensitif", submit: "Kirim",
-        uploadSuccess: "Mod berhasil diunggah! Menunggu peninjauan...",
-        yourUploads: "Unggahan Anda",
-        status: "Status", authorName: "Penulis",
-        pending: "Menunggu", approved: "Disetujui", rejected: "Ditolak",
-        accountProfile: "Profil Akun",
-        username: "Nama Pengguna", bio: "Bio", email: "Email", password: "Kata Sandi",
-        updateProfile: "Perbarui Profil", currentPassword: "Kata Sandi Saat Ini", newPassword: "Kata Sandi Baru",
-        modDetails: "Detail Mod", close: "Tutup", download: "Unduh",
-        downloadStartsIn: "Unduhan dimulai dalam...",
-        downloading: "Mengunduh...",
-        comments: "Komentar", postComment: "Kirim Komentar",
-        authorBadge: "Penulis Mod",
-        reportMod: "Laporkan Mod", reportInstructions: "Tempel ID Mod untuk dilaporkan:", submitReport: "Kirim Laporan",
-        loginTitle: "Masuk ke akun Anda",
-        emailPlaceholder: "Alamat email", passwordPlaceholder: "Kata sandi",
-        noAccount: "Belum punya akun?",
-        registerTitle: "Buat akun baru",
-        alreadyAccount: "Sudah punya akun?",
-        myFriends: "Teman Saya",
-        noModsFound: "Tidak ada mod yang ditemukan.",
-        modCategory: "Kategori",
-        tutorial: "Tutorial",
-        mod: "Mod",
-        modpack: "Modpack",
-        downloadGuide: "Panduan Unduh",
-        downloadInstructions: "Petunjuk untuk mengunduh",
-        downloadingFile: "Mengunduh berkas...",
-        error: "Kesalahan",
-        passwordMismatch: "Kata sandi baru tidak cocok.",
-        reauthRequired: "Silakan autentikasi ulang untuk mengubah email/kata sandi.",
-        reportSuccess: "Laporan berhasil dikirim.",
-        profileUpdateSuccess: "Profil berhasil diperbarui.",
-        noModsUploads: "Anda belum mengunggah mod apa pun.",
-        addToFavorites: "Tambahkan ke Favorit",
-        removeFromFavorites: "Hapus dari Favorit",
-        addToDownloadLater: "Tambahkan ke Unduh Nanti",
-        removeFromDownloadLater: "Hapus dari Unduh Nanti"
-      },
-      ru: {
-        home: "Главная", uploadMods: "Загрузить моды", myUploads: "Мои загрузки", profile: "Профиль", login: "Войти", register: "Регистрация", logout: "Выйти",
-        favorites: "Избранные моды", downloadLater: "Скачать позже",
-        search: "Искать моды...",
-        newModsAvailable: "Доступны новые моды!",
-        welcome: "Добро пожаловать на Мод-портал!",
-        latestMods: "Последние моды",
-        gameTitle: "Название игры", rules: "Правила загрузки", filesLink: "Файлы (внешняя ссылка)",
-        thumbnail: "URL миниатюры", imageDetails: "URL изображений", description: "Описание мода",
-        exclusive: "Эксклюзивный мод",
-        author: "Я автор", matureContent: "18+ / Контент для взрослых", submit: "Отправить",
-        uploadSuccess: "Мод успешно загружен! Ожидает проверки...",
-        yourUploads: "Ваши загрузки",
-        status: "Статус", authorName: "Автор",
-        pending: "В ожидании", approved: "Одобрено", rejected: "Отклонено",
-        accountProfile: "Профиль аккаунта",
-        username: "Имя пользователя", bio: "Био", email: "Email", password: "Пароль",
-        updateProfile: "Обновить профиль", currentPassword: "Текущий пароль", newPassword: "Новый пароль",
-        modDetails: "Детали мода", close: "Закрыть", download: "Скачать",
-        downloadStartsIn: "Скачивание начнется через...",
-        downloading: "Скачивание...",
-        comments: "Комментарии", postComment: "Оставить комментарий",
-        authorBadge: "Автор мода",
-        reportMod: "Сообщить о моде", reportInstructions: "Вставьте ID мода для отправки жалобы:", submitReport: "Отправить жалобу",
-        loginTitle: "Войдите в свой аккаунт",
-        emailPlaceholder: "Адрес электронной почты", passwordPlaceholder: "Пароль",
-        noAccount: "Нет аккаунта?",
-        registerTitle: "Создать новый аккаунт",
-        alreadyAccount: "Уже есть аккаунт?",
-        myFriends: "Мои друзья",
-        noModsFound: "Моды не найдены.",
-        modCategory: "Категория",
-        tutorial: "Руководство",
-        mod: "Мод",
-        modpack: "Сборка модов",
-        downloadGuide: "Руководство по загрузке",
-        downloadInstructions: "Инструкции по скачиванию",
-        downloadingFile: "Загрузка файла...",
-        error: "Ошибка",
-        passwordMismatch: "Новые пароли не совпадают.",
-        reauthRequired: "Пожалуйста, повторно авторизуйтесь, чтобы изменить email/пароль.",
-        reportSuccess: "Жалоба успешно отправлена.",
-        profileUpdateSuccess: "Профиль успешно обновлен.",
-        noModsUploads: "Вы еще не загрузили ни одного мода.",
-        addToFavorites: "Добавить в избранное",
-        removeFromFavorites: "Удалить из избранного",
-        addToDownloadLater: "Добавить в 'Скачать позже'",
-        removeFromDownloadLater: "Удалить из 'Скачать позже'"
-      }
-    };
-
-    // Fungsi untuk memperbarui teks UI berdasarkan bahasa
-    function updateText() {
-      const elements = document.querySelectorAll('[data-i18n]');
-      elements.forEach(el => {
-        const key = el.getAttribute('data-i18n');
-        if (el.tagName === 'INPUT' && el.type === 'text') {
-            el.placeholder = translations[currentLanguage][key] || key;
-        } else {
-            el.textContent = translations[currentLanguage][key] || key;
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ModsDown</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #111827; /* Warna latar belakang sangat gelap */
+            color: #e5e7eb; /* Warna teks sangat terang */
         }
-      });
-    }
-
-    // Toggle dropdown
-    window.toggleProfileDropdown = () => {
-      profileDropdownMenu.classList.toggle('hidden');
-    };
-
-    window.addEventListener('click', (e) => {
-        if (!profileButton.contains(e.target) && !profileDropdownMenu.contains(e.target)) {
-            profileDropdownMenu.classList.add('hidden');
+        .header {
+            background-color: #1f2937; /* Warna header yang kontras dengan body */
+            border-bottom: 1px solid #374151;
         }
-    });
-
-    // Ganti bahasa
-    if(languageSelect) {
-        languageSelect.addEventListener('change', (e) => {
-            currentLanguage = e.target.value;
-            updateText();
-        });
-    }
-
-    // Navigasi halaman
-    window.navigateTo = (pageId) => {
-      Object.values(pages).forEach(page => {
-        if (page) page.style.display = 'none';
-      });
-      if (pages[pageId]) {
-        pages[pageId].style.display = 'block';
-        if (pageId === 'home') loadMods();
-        if (pageId === 'myUploads') loadMyUploads();
-        if (pageId === 'profile') loadUserProfile();
-        if (pageId === 'favorites') loadFavoriteMods();
-        if (pageId === 'downloadLater') loadDownloadLaterMods();
-      }
-      profileDropdownMenu.classList.add('hidden');
-    }
-
-    // Tampilkan modal
-    window.showModal = (modalId) => {
-      const modal = document.getElementById(modalId);
-      if (modal) {
-        modal.classList.remove('hidden');
-        modal.classList.add('flex');
-      }
-    }
-
-    // Sembunyikan modal
-    window.hideModal = (modalId) => {
-      const modal = document.getElementById(modalId);
-      if (modal) {
-        modal.classList.add('hidden');
-        modal.classList.remove('flex');
-      }
-    }
-    
-    // --- Otentikasi dan Manajemen Pengguna ---
-    
-    // Fungsi untuk memperbarui UI setelah otentikasi
-    const updateUI = (user) => {
-        const loggedIn = !!user;
-
-        // Tampilkan/Sembunyikan item navigasi
-        if (authItems.login) authItems.login.style.display = loggedIn ? 'none' : 'block';
-        if (authItems.register) authItems.register.style.display = loggedIn ? 'none' : 'block';
-        if (authItems.logout) authItems.logout.style.display = loggedIn ? 'block' : 'none';
-        
-        if (navItems.upload) navItems.upload.style.display = loggedIn ? 'block' : 'none';
-        if (navItems.profileDropdown) navItems.profileDropdown.style.display = loggedIn ? 'block' : 'none';
-
-        if (loggedIn) {
-            userId = user.uid;
-            // Panggil fungsi untuk mengambil data pengguna dari Firestore
-            setupUserProfileListener();
-        } else {
-            userId = null;
+        .container {
+            max-width: 1200px;
+            margin-left: auto;
+            margin-right: auto;
+            padding: 1.5rem;
         }
-        updateText();
-    };
+        .mod-card {
+            background-color: #1f2937; /* Warna kartu mod */
+            border-radius: 0.75rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            overflow: hidden;
+            cursor: pointer;
+            transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        }
+        .mod-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+        }
+        .mod-image {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+        }
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .modal-content {
+            background-color: #1f2937; /* Warna modal */
+            padding: 2rem;
+            border-radius: 0.75rem;
+            max-width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            position: relative;
+            color: #e5e7eb;
+        }
+        .close-button {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            font-size: 1.5rem;
+            line-height: 1;
+            color: #9ca3af;
+            cursor: pointer;
+        }
+        .button {
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .btn-primary {
+            background-color: #3b82f6; /* Warna biru untuk tombol utama */
+            color: #ffffff;
+        }
+        .btn-primary:hover {
+            background-color: #2563eb;
+        }
+        input[type="text"], input[type="email"], input[type="password"], input[type="url"], textarea, select {
+            background-color: #374151; /* Warna input field */
+            border-color: #374151;
+            color: #e5e7eb;
+        }
+        input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focus, input[type="url"]:focus, textarea:focus, select:focus {
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5);
+        }
+    </style>
+</head>
+<body>
 
-    // Login
-    if (document.getElementById('loginForm')) {
-        document.getElementById('loginForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const email = document.getElementById('loginEmail').value;
-            const password = document.getElementById('loginPassword').value;
-            try {
-                await signInWithEmailAndPassword(auth, email, password);
-                // Navigasi dilakukan oleh onAuthStateChanged listener
-            } catch (error) {
-                if (document.getElementById('loginError')) {
-                    document.getElementById('loginError').textContent = error.message;
-                }
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, signOut, updateProfile, updateEmail, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, addDoc, collection, onSnapshot, serverTimestamp, arrayUnion } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Global variables for Firebase config
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // State variables
+        let user = null;
+        let userId = null;
+        let mods = [];
+        let favoriteMods = [];
+        let downloadLaterMods = [];
+        let friends = [];
+        let notifications = [];
+        let myUploads = [];
+        let selectedMod = null;
+
+        // Translations (as per previous React code)
+        const t = {
+            id: {
+                appName: "ModsDown", home: "Beranda", uploadMods: "Unggah Mod", myUploads: "Unggahan Saya", profile: "Profil", logout: "Keluar",
+                search: "Cari...", newestMods: "Mod Terbaru", noMods: "Belum ada mod yang diunggah.", uploadFormTitle: "Unggah Mod Baru",
+                gameTitle: "Judul Game", filesLink: "Tautan Eksternal File", rulesTitle: "Aturan Unggah Mod",
+                rulesText: "Pastikan file tidak mengandung virus atau malware. Konten dewasa harus diberi label. Dilarang mengunggah konten ilegal. Konten terkait politik, rasisme, atau kebencian dilarang.",
+                imageThumbnail: "Gambar Thumbnail", imageDetails: "Gambar Detail", addAnotherImage: "Tambah Gambar Lain",
+                modDescription: "Deskripsi Mod", exclusive: "Eksklusif", auth: "Ini karya saya", matureContent: "18+", submit: "Kirim",
+                submitLoading: "Mengunggah...", successUpload: "Mod berhasil diunggah! Unggahan Anda akan segera diproses.",
+                myUploadsTitle: "Unggahan Saya", status: "Status", description: "Deskripsi", author: "Penulis",
+                uploaded: "Terunggah", pending: "Menunggu", profileTitle: "Profil Pengguna", name: "Nama", email: "Email",
+                password: "Kata Sandi", changeEmail: "Ubah Email", changePassword: "Ubah Kata Sandi", save: "Simpan",
+                oldPassword: "Kata Sandi Lama", newPassword: "Kata Sandi Baru", confirmNewPassword: "Konfirmasi Kata Sandi Baru",
+                loginTitle: "Masuk ke Akun Anda", registerTitle: "Buat Akun Baru", language: "Bahasa",
+                favorites: "Mod Favorit", reportMod: "Laporkan Mod", downloadLater: "Unduh Nanti", myFriends: "Teman Saya",
+                enterModId: "Masukkan ID Mod yang ingin dilaporkan", submitReport: "Kirim Laporan", reportSuccess: "Laporan berhasil dikirim!",
+                notifications: "Notifikasi", newModNotification: "Mod baru telah diunggah!", addFriend: "Tambah Teman",
+                friendId: "ID Teman", addFriendSuccess: "Permintaan pertemanan berhasil dikirim!",
+                downloadLaterTitle: "Mod untuk Diunduh Nanti", noModsFound: "Tidak ada mod yang ditemukan.",
+                addFav: "Tambahkan ke Favorit", removeFav: "Hapus dari Favorit", download: "Unduh",
+                downloadLaterBtn: "Unduh Nanti", profileUserId: "ID Pengguna Anda", copyToClipboard: "Salin ke Clipboard",
+                close: "Tutup", category: "Kategori", tutorial: "Tutorial", mods: "Mods", modpack: "Modpack",
+                guideline: "Panduan Unduh", downloadCountdown: "Tautan unduhan akan muncul dalam ", downloadLink: "Tautan Unduhan",
+                comments: "Komentar", addComment: "Tambahkan komentar...", submitComment: "Kirim Komentar",
+                modAuthor: "Penulis Mods", reply: "Balas", noComments: "Belum ada komentar."
+            },
+            en: {
+                appName: "ModsDown", home: "Home", uploadMods: "Upload Mods", myUploads: "My Uploads", profile: "Profile", logout: "Logout",
+                search: "Search...", newestMods: "Newest Mods", noMods: "No mods uploaded yet.", uploadFormTitle: "Upload New Mod",
+                gameTitle: "Game Title", filesLink: "External File Link", rulesTitle: "Mod Upload Rules",
+                rulesText: "Ensure files do not contain viruses or malware. Mature content must be labeled. It is forbidden to upload illegal content. Content related to politics, racism, or hatred is prohibited.",
+                imageThumbnail: "Thumbnail Image", imageDetails: "Detail Images", addAnotherImage: "Add Another Image",
+                modDescription: "Mod Description", exclusive: "Exclusive", auth: "This is my work", matureContent: "18+", submit: "Submit",
+                submitLoading: "Uploading...", successUpload: "Mod uploaded successfully! Your upload will be processed shortly.",
+                myUploadsTitle: "My Uploads", status: "Status", description: "Description", author: "Author",
+                uploaded: "Uploaded", pending: "Pending", profileTitle: "User Profile", name: "Name", email: "Email",
+                password: "Password", changeEmail: "Change Email", changePassword: "Change Password", save: "Save",
+                oldPassword: "Old Password", newPassword: "New Password", confirmNewPassword: "Confirm New Password",
+                loginTitle: "Login to Your Account", registerTitle: "Create New Account", language: "Language",
+                favorites: "Favorite Mods", reportMod: "Report Mod", downloadLater: "Download Later", myFriends: "My Friends",
+                enterModId: "Enter Mod ID to report", submitReport: "Submit Report", reportSuccess: "Report submitted successfully!",
+                notifications: "Notifications", newModNotification: "A new mod has been uploaded!", addFriend: "Add Friend",
+                friendId: "Friend ID", addFriendSuccess: "Friend request sent successfully!",
+                downloadLaterTitle: "Mods for Download Later", noModsFound: "No mods found.",
+                addFav: "Add to Favorites", removeFav: "Remove from Favorites", download: "Download",
+                downloadLaterBtn: "Download Later", profileUserId: "Your User ID", copyToClipboard: "Copy to Clipboard",
+                close: "Close", category: "Category", tutorial: "Tutorial", mods: "Mods", modpack: "Modpack",
+                guideline: "Download Guide", downloadCountdown: "Download link will appear in ", downloadLink: "Download Link",
+                comments: "Comments", addComment: "Add a comment...", submitComment: "Submit Comment",
+                modAuthor: "Mod Author", reply: "Reply", noComments: "No comments yet."
             }
-        });
-    }
+            // Add other languages here
+        };
+        let currentLang = 'id';
 
-    // Registrasi
-    if (document.getElementById('registerForm')) {
-        document.getElementById('registerForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const email = document.getElementById('registerEmail').value;
-            const password = document.getElementById('registerPassword').value;
+        // --- Helper Functions ---
+        function getUserId() {
+            return user ? user.uid : crypto.randomUUID();
+        }
+
+        // FUNGSI INI DIDEKLARASIKAN KE OBJEK WINDOW AGAR BISA DIAKSES DARI onclick HTML
+        window.renderPage = function(pageId) {
+            document.querySelectorAll('main > div').forEach(div => {
+                div.classList.add('hidden');
+            });
+            document.getElementById(pageId).classList.remove('hidden');
+        }
+
+        window.showModal = function(message) {
+            const modal = document.getElementById('info-modal');
+            const modalMessage = document.getElementById('modal-message');
+            modalMessage.textContent = message;
+            modal.classList.remove('hidden');
+        }
+
+        window.closeModal = function() {
+            document.getElementById('info-modal').classList.add('hidden');
+        }
+
+        window.copyToClipboard = function(text) {
             try {
-                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-                const user = userCredential.user;
-                await setDoc(doc(db, "users", user.uid), {
-                    uid: user.uid,
-                    username: `User-${Math.floor(Math.random() * 10000)}`,
-                    bio: "",
-                    email: user.email,
-                    createdAt: serverTimestamp(),
-                    favorites: [],
-                    downloadLater: []
+                const textarea = document.createElement('textarea');
+                textarea.value = text;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                showModal(t[currentLang].copyToClipboard);
+            } catch (err) {
+                console.error('Failed to copy text: ', err);
+            }
+        }
+
+        // --- Firestore Data Fetching and Rendering ---
+        function setupDataListeners() {
+            // Mods Listener
+            const modsPath = `artifacts/${appId}/public/data/mods`;
+            onSnapshot(collection(db, modsPath), (snapshot) => {
+                mods = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                renderMods(mods);
+            });
+
+            // User Profile Listener (for favorites, download later, friends, and uploads)
+            if (userId) {
+                const userDocRef = doc(db, `artifacts/${appId}/users/${userId}/profile`, "data");
+                onSnapshot(userDocRef, (docSnap) => {
+                    if (docSnap.exists()) {
+                        const data = docSnap.data();
+                        favoriteMods = data.favorites || [];
+                        downloadLaterMods = data.downloadLater || [];
+                        friends = data.friends || [];
+                        notifications = data.notifications || [];
+                    } else {
+                        favoriteMods = [];
+                        downloadLaterMods = [];
+                        friends = [];
+                        notifications = [];
+                    }
+                    renderFavoriteMods();
+                    renderDownloadLaterMods();
+                    renderFriends();
+                    renderNotifications();
                 });
-                // Navigasi dilakukan oleh onAuthStateChanged listener
-            } catch (error) {
-                if (document.getElementById('registerError')) {
-                    document.getElementById('registerError').textContent = error.message;
-                }
+                const uploadsPath = `artifacts/${appId}/users/${userId}/uploads`;
+                onSnapshot(collection(db, uploadsPath), (snapshot) => {
+                    myUploads = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    renderMyUploads();
+                });
             }
-        });
-    }
+        }
 
-    // Logout
-    if (authItems.logout) {
-        authItems.logout.addEventListener('click', async () => {
-            await signOut(auth);
-            // Navigasi dilakukan oleh onAuthStateChanged listener
-        });
-    }
+        function renderMods(modsList, containerId = 'mod-grid') {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+            container.innerHTML = '';
+            const filteredMods = modsList.filter(mod => {
+                // Sederhana: Tampilkan semua mod
+                return true;
+            });
 
-    // Listener status otentikasi
-    onAuthStateChanged(auth, (user) => {
-        console.log("onAuthStateChanged: ", user?.uid ? `User signed in with UID: ${user.uid}` : "User signed out or is anonymous");
-        updateUI(user);
-        // Pindahkan navigasi awal ke sini untuk mencegah race condition
-        navigateTo('home');
-    });
-
-    // --- Manajemen Mod ---
-
-    // Listener untuk mod terbaru di beranda
-    function loadMods() {
-      const modsListContainer = document.getElementById('modsList');
-      if (!modsListContainer) return;
-      
-      const q = query(collection(db, "mods"));
-      modsListContainer.innerHTML = '';
-      
-      // onSnapshot akan dipanggil pertama kali dengan data, lalu setiap ada perubahan
-      onSnapshot(q, (snapshot) => {
-        allMods = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        displayMods(allMods, modsListContainer);
-      }, (error) => {
-          console.error("Error fetching mods: ", error);
-          modsListContainer.innerHTML = `<p class="text-center text-red-500">${error.message}</p>`;
-      });
-    }
-
-    // Menampilkan daftar mod
-    function displayMods(mods, container) {
-      container.innerHTML = '';
-      if (mods.length === 0) {
-        container.innerHTML = `<p class="text-center text-gray-500" data-i18n="noModsFound"></p>`;
-        updateText();
-        return;
-      }
-      mods.forEach(mod => {
-        const modCard = document.createElement('div');
-        modCard.className = 'bg-gray-700 rounded-lg shadow-md p-4 cursor-pointer hover:bg-gray-600 transition-colors duration-200';
-        modCard.innerHTML = `
-          <img src="${mod.thumbnail}" alt="Thumbnail" class="w-full h-40 object-cover rounded-md mb-2">
-          <h3 class="text-lg font-semibold text-white">${mod.gameTitle}</h3>
-          <p class="text-sm text-gray-400">by ${mod.authorName}</p>
-        `;
-        modCard.addEventListener('click', () => showModDetails(mod));
-        container.appendChild(modCard);
-      });
-      updateText();
-    }
-
-    // Unggah mod
-    if(document.getElementById('uploadForm')){
-        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            if (!userId) {
-                // Gunakan modal atau pesan di UI alih-alih alert
-                showNotification(translations[currentLanguage].error, 'You must be logged in to upload mods.');
-                return;
-            }
-            const form = e.target;
-            const gameTitle = form.gameTitle.value;
-            const filesLink = form.filesLink.value;
-            const thumbnail = form.thumbnail.value;
-            const description = form.description.value;
-            const exclusive = form.exclusive.checked;
-            const authorCheck = form.authorCheck.checked;
-            const matureContent = form.matureContent.checked;
-            const category = form.category.value;
-            const downloadGuide = form.downloadGuide.value;
-            const imageDetails = Array.from(document.querySelectorAll('#imageDetailsContainer input')).map(input => input.value).filter(val => val);
-
-            if (!gameTitle || !filesLink) {
-                showNotification(translations[currentLanguage].error, 'Game Title and Files Link are required.');
+            if (filteredMods.length === 0) {
+                container.innerHTML = `<p class="text-center col-span-full text-gray-500">${t[currentLang].noMods}</p>`;
                 return;
             }
 
-            try {
-                const userDoc = await getDoc(doc(db, "users", userId));
-                const authorName = userDoc.exists() ? userDoc.data().username : "Anonymous";
-
-                const newModRef = await addDoc(collection(db, "mods"), {
-                    gameTitle,
-                    filesLink,
-                    thumbnail,
-                    description,
-                    exclusive,
-                    authorCheck,
-                    matureContent,
-                    authorId: userId,
-                    authorName,
-                    category,
-                    downloadGuide,
-                    imageDetails,
-                    status: 'pending', // Status awal
-                    createdAt: serverTimestamp(),
-                    likes: [],
-                    reports: []
-                });
-
-                // Simulasikan penundaan 10 detik dan perbarui status
-                setTimeout(async () => {
-                    await updateDoc(newModRef, { status: 'approved' });
-                    // showNotification("Mod Status Updated", 'Mod status updated to Approved.');
-                }, 10000);
-
-                const uploadMessageEl = document.getElementById('uploadMessage');
-                if (uploadMessageEl) {
-                    uploadMessageEl.textContent = translations[currentLanguage].uploadSuccess;
-                }
-                form.reset();
-                navigateTo('myUploads');
-            } catch (error) {
-                console.error("Error uploading mod: ", error);
-                showNotification(translations[currentLanguage].error, 'Failed to upload mod.');
-            }
-        });
-    }
-
-    // Tambah input gambar detail
-    if (document.getElementById('addImageDetails')) {
-        document.getElementById('addImageDetails').addEventListener('click', () => {
-            const container = document.getElementById('imageDetailsContainer');
-            if (container) {
-                const input = document.createElement('input');
-                input.type = 'url';
-                input.className = 'w-full p-2 rounded-md bg-gray-600 text-white border border-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2';
-                input.placeholder = translations[currentLanguage].imageDetails;
-                container.appendChild(input);
-                updateText();
-            }
-        });
-    }
-    
-    // Tampilkan unggahan saya
-    function loadMyUploads() {
-      const myUploadsContainer = document.getElementById('myUploadsList');
-      if (!myUploadsContainer) return;
-
-      if (!userId) {
-          myUploadsContainer.innerHTML = `<p class="text-center text-red-500">Please log in to see your uploads.</p>`;
-          return;
-      }
-      
-      const q = query(collection(db, "mods"), where("authorId", "==", userId));
-      myUploadsContainer.innerHTML = '';
-      
-      onSnapshot(q, (snapshot) => {
-        myUploadsContainer.innerHTML = '';
-        if (snapshot.empty) {
-          myUploadsContainer.innerHTML = `<p class="text-center text-gray-500" data-i18n="noModsUploads"></p>`;
-          updateText();
-          return;
-        }
-        snapshot.forEach(doc => {
-          const mod = { id: doc.id, ...doc.data() };
-          const modItem = document.createElement('div');
-          modItem.className = 'bg-gray-700 rounded-lg shadow-md p-4 flex justify-between items-center mb-2';
-          modItem.innerHTML = `
-            <div>
-              <h4 class="text-lg font-semibold text-white">${mod.gameTitle}</h4>
-              <p class="text-sm text-gray-400" data-i18n="description"></p>
-              <p class="text-sm text-gray-400 overflow-hidden text-ellipsis whitespace-nowrap max-w-sm">${mod.description}</p>
-              <p class="text-sm text-gray-400"><span data-i18n="authorName"></span>: ${mod.authorName}</p>
-            </div>
-            <div>
-              <p class="text-sm font-bold text-white"><span data-i18n="status"></span>: ${translations[currentLanguage][mod.status] || mod.status}</p>
-              <button class="bg-red-500 hover:bg-red-600 text-white font-bold py-1 px-2 rounded mt-2" onclick="deleteMod('${mod.id}')">Delete</button>
-            </div>
-          `;
-          myUploadsContainer.appendChild(modItem);
-        });
-        updateText();
-      }, (error) => {
-          console.error("Error fetching my uploads: ", error);
-          myUploadsContainer.innerHTML = `<p class="text-center text-red-500">${error.message}</p>`;
-      });
-    }
-    
-    // Hapus Mod
-    window.deleteMod = async function(modId) {
-      if (confirm('Are you sure you want to delete this mod?')) {
-        try {
-          await deleteDoc(doc(db, "mods", modId));
-          // showNotification("Success", 'Mod deleted successfully.');
-        } catch (error) {
-          console.error("Error deleting mod:", error);
-          showNotification("Error", 'Failed to delete mod.');
-        }
-      }
-    };
-
-    // --- Pop-up Detail Mod ---
-    window.showModDetails = async (mod) => {
-        const modDetailsModal = document.getElementById('modDetailsModal');
-        if (!modDetailsModal) return;
-
-        document.getElementById('modDetailsTitle').textContent = mod.gameTitle;
-        document.getElementById('modDetailsAuthor').textContent = `${mod.authorName}`;
-        document.getElementById('modDetailsDescription').textContent = mod.description;
-        document.getElementById('modDetailsId').textContent = `Mod ID: ${mod.id}`;
-        document.getElementById('modDetailsCategory').textContent = `${translations[currentLanguage].modCategory}: ${translations[currentLanguage][mod.category]}`;
-        
-        const modDetailsDownloadGuideEl = document.getElementById('modDetailsDownloadGuide');
-        if (modDetailsDownloadGuideEl) {
-            modDetailsDownloadGuideEl.innerHTML = `
-                <h4 class="text-md font-bold mb-1" data-i18n="downloadGuide"></h4>
-                <p class="text-gray-400">${mod.downloadGuide}</p>
-            `;
-        }
-
-        const imagesContainer = document.getElementById('modDetailsImages');
-        if (imagesContainer) {
-            imagesContainer.innerHTML = '';
-            mod.imageDetails.forEach(url => {
-                if (url) {
-                    const img = document.createElement('img');
-                    img.src = url;
-                    img.alt = 'Mod Detail';
-                    img.className = 'w-full rounded-md mb-2';
-                    imagesContainer.appendChild(img);
-                }
+            filteredMods.forEach(mod => {
+                const modCard = document.createElement('div');
+                modCard.className = 'mod-card p-4 flex flex-col justify-between';
+                modCard.innerHTML = `
+                    <img src="${mod.thumbnail}" alt="${mod.gameTitle}" class="mod-image rounded-md mb-4" />
+                    <div class="flex-grow">
+                        <h3 class="text-xl font-bold mb-2 text-white">${mod.gameTitle}</h3>
+                        <p class="text-sm text-gray-400 mb-2">${t[currentLang].author}: ${mod.authorName || 'Anonim'}</p>
+                        <p class="text-sm text-gray-300 line-clamp-3">${mod.description}</p>
+                    </div>
+                `;
+                modCard.addEventListener('click', () => window.showModDetails(mod));
+                container.appendChild(modCard);
             });
         }
-      
-        // Update download button link
-        const downloadButton = document.getElementById('modDetailsDownloadButton');
-        if (downloadButton) {
-            downloadButton.onclick = () => startDownloadCountdown(mod.filesLink);
+        
+        function renderMyUploads() {
+             const container = document.getElementById('my-uploads-table-body');
+             if (!container) return;
+             container.innerHTML = '';
+             if (myUploads.length === 0) {
+                 document.getElementById('my-uploads').innerHTML = `<p class="text-center text-gray-500">Anda belum mengunggah mod apapun.</p>`;
+                 return;
+             }
+             myUploads.forEach(mod => {
+                 const row = document.createElement('tr');
+                 const statusClass = mod.status === 'uploaded' ? 'bg-green-600 text-white' : 'bg-yellow-600 text-white';
+                 row.innerHTML = `
+                     <td class="px-6 py-4 whitespace-no-wrap border-b border-gray-700">${mod.gameTitle}</td>
+                     <td class="px-6 py-4 whitespace-no-wrap border-b border-gray-700">
+                         <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClass}">
+                             ${mod.status === 'uploaded' ? t[currentLang].uploaded : t[currentLang].pending}
+                         </span>
+                     </td>
+                     <td class="px-6 py-4 whitespace-no-wrap border-b border-gray-700">${mod.description.substring(0, 50)}...</td>
+                     <td class="px-6 py-4 whitespace-no-wrap border-b border-gray-700">${mod.authorName || 'Anonim'}</td>
+                     <td class="px-6 py-4 whitespace-no-wrap border-b border-gray-700">
+                         <button onclick="window.copyToClipboard('${mod.id}')" class="bg-gray-700 text-gray-200 px-2 py-1 rounded-full text-xs hover:bg-gray-600">
+                             Salin ID
+                         </button>
+                     </td>
+                 `;
+                 container.appendChild(row);
+             });
         }
 
-        // Report button
-        const reportButton = document.getElementById('reportModButton');
-        if (reportButton) {
-            reportButton.onclick = () => {
-                const reportModIdEl = document.getElementById('reportModId');
-                if (reportModIdEl) reportModIdEl.value = mod.id;
-                showModal('reportModal');
-                hideModal('modDetailsModal');
-            };
+        function renderFavoriteMods() {
+            const favoriteModsData = mods.filter(mod => favoriteMods.includes(mod.id));
+            renderMods(favoriteModsData, 'favorites-mod-grid');
         }
 
-        // Like/Unlike button
-        const likeButton = document.getElementById('likeModButton');
-        if (likeButton) {
-            const userDoc = await getDoc(doc(db, "users", userId));
-            const userData = userDoc.data();
-            if (userData && userData.favorites && userData.favorites.includes(mod.id)) {
-                likeButton.textContent = translations[currentLanguage].removeFromFavorites;
-                likeButton.onclick = () => unlikeMod(mod.id);
-            } else {
-                likeButton.textContent = translations[currentLanguage].addToFavorites;
-                likeButton.onclick = () => likeMod(mod.id);
-            }
+        function renderDownloadLaterMods() {
+            const downloadLaterModsData = mods.filter(mod => downloadLaterMods.includes(mod.id));
+            renderMods(downloadLaterModsData, 'download-later-mod-grid');
         }
 
-        // Download Later button
-        const downloadLaterButton = document.getElementById('downloadLaterButton');
-        if (downloadLaterButton) {
-            const userDoc = await getDoc(doc(db, "users", userId));
-            const userData = userDoc.data();
-            if (userData && userData.downloadLater && userData.downloadLater.includes(mod.id)) {
-                downloadLaterButton.textContent = translations[currentLanguage].removeFromDownloadLater;
-                downloadLaterButton.onclick = () => removeDownloadLater(mod.id);
-            } else {
-                downloadLaterButton.textContent = translations[currentLanguage].addToDownloadLater;
-                downloadLaterButton.onclick = () => addDownloadLater(mod.id);
-            }
-        }
-
-        loadComments(mod.id, mod.authorId);
-        updateText();
-        showModal('modDetailsModal');
-    }
-
-    if (document.getElementById('closeModDetails')) {
-        document.getElementById('closeModDetails').addEventListener('click', () => hideModal('modDetailsModal'));
-    }
-
-    // Fungsi unduh dengan hitungan mundur
-    function startDownloadCountdown(url) {
-      const downloadBtn = document.getElementById('modDetailsDownloadButton');
-      if (!downloadBtn) return;
-      let countdown = 10;
-      downloadBtn.disabled = true;
-      downloadBtn.textContent = `${translations[currentLanguage].downloadStartsIn} ${countdown}s`;
-
-      const countdownInterval = setInterval(() => {
-        countdown--;
-        downloadBtn.textContent = `${translations[currentLanguage].downloadStartsIn} ${countdown}s`;
-        if (countdown <= 0) {
-          clearInterval(countdownInterval);
-          downloadBtn.textContent = translations[currentLanguage].downloading;
-          window.open(url, '_blank');
-          setTimeout(() => {
-            downloadBtn.textContent = translations[currentLanguage].download;
-            downloadBtn.disabled = false;
-          }, 2000);
-        }
-      }, 1000);
-    }
-
-    // Komentar
-    function loadComments(modId, modAuthorId) {
-      const commentsContainer = document.getElementById('commentsContainer');
-      if (!commentsContainer) return;
-
-      commentsContainer.innerHTML = '';
-      const q = query(collection(db, "mods", modId, "comments"));
-      onSnapshot(q, async (snapshot) => {
-        commentsContainer.innerHTML = '';
-        const userPromises = snapshot.docs.map(doc => getDoc(doc(db, "users", doc.data().userId)).then(userDoc => userDoc.data()?.username || 'Anonymous'));
-        const usernames = await Promise.all(userPromises);
-
-        snapshot.docs.forEach((doc, index) => {
-          const comment = doc.data();
-          const commentItem = document.createElement('div');
-          commentItem.className = 'bg-gray-800 p-3 rounded-md mb-2';
-          const authorBadge = comment.userId === modAuthorId ? `<span class="text-blue-400 text-sm ml-2" data-i18n="authorBadge"></span>` : '';
-          commentItem.innerHTML = `
-            <p class="text-white font-semibold">${usernames[index] || 'Anonymous'}${authorBadge}</p>
-            <p class="text-gray-300 text-sm mt-1">${comment.text}</p>
-          `;
-          commentsContainer.appendChild(commentItem);
-        });
-        updateText();
-      }, (error) => {
-          console.error("Error fetching comments: ", error);
-      });
-    }
-
-    if (document.getElementById('commentForm')) {
-        document.getElementById('commentForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const modId = document.getElementById('modDetailsId').textContent.split(': ')[1];
-            const commentInput = document.getElementById('commentInput');
-            if (!commentInput) return;
-            const commentText = commentInput.value;
-
-            if (commentText.trim() === '') return;
-
-            try {
-                await addDoc(collection(db, "mods", modId, "comments"), {
-                    text: commentText,
-                    userId: userId,
-                    createdAt: serverTimestamp()
-                });
-                commentInput.value = '';
-            } catch (error) {
-                console.error("Error posting comment: ", error);
-                showNotification("Error", 'Failed to post comment.');
-            }
-        });
-    }
-
-    // --- Fitur Tambahan ---
-
-    // Pencarian
-    if (searchInput) {
-        searchInput.addEventListener('input', (e) => {
-            const searchTerm = e.target.value.toLowerCase();
-            const filteredMods = allMods.filter(mod => 
-                mod.gameTitle.toLowerCase().includes(searchTerm) ||
-                mod.description.toLowerCase().includes(searchTerm) ||
-                mod.authorName.toLowerCase().includes(searchTerm)
-            );
-            const modsListContainer = document.getElementById('modsList');
-            if (modsListContainer) {
-                displayMods(filteredMods, modsListContainer);
-            }
-        });
-    }
-    
-    function showNotification(title, message) {
-        const modal = document.getElementById('notificationModal');
-        if (modal) {
-            document.getElementById('notificationTitle').textContent = title;
-            document.getElementById('notificationMessage').textContent = message;
-            showModal('notificationModal');
-        }
-    }
-
-    // Notifikasi (modal sederhana)
-    if (notificationButton) {
-        notificationButton.addEventListener('click', () => {
-            showNotification('Notifikasi', translations[currentLanguage].newModsAvailable);
-        });
-    }
-    if (document.getElementById('closeNotificationModal')) {
-        document.getElementById('closeNotificationModal').addEventListener('click', () => hideModal('notificationModal'));
-    }
-
-    // Laporan mod
-    if (document.getElementById('reportForm')) {
-        document.getElementById('reportForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const reportModIdEl = document.getElementById('reportModId');
-            const reportReasonEl = document.getElementById('reportReason');
-            if (!reportModIdEl || !reportReasonEl) return;
-
-            const modId = reportModIdEl.value;
-            const reportReason = reportReasonEl.value;
-
-            if (!modId) {
-                showNotification(translations[currentLanguage].error, 'Mod ID is required.');
+        function renderFriends() {
+            const container = document.getElementById('friends-list');
+            if (!container) return;
+            container.innerHTML = '';
+            if (friends.length === 0) {
+                container.innerHTML = `<p class="text-center text-gray-500">Belum ada teman.</p>`;
                 return;
             }
-
-            try {
-                const modRef = doc(db, "mods", modId);
-                await updateDoc(modRef, {
-                    reports: arrayUnion({
-                        reporterId: userId,
-                        reason: reportReason,
-                        reportedAt: serverTimestamp()
-                    })
-                });
-                const reportMessageEl = document.getElementById('reportMessage');
-                if (reportMessageEl) reportMessageEl.textContent = translations[currentLanguage].reportSuccess;
-            } catch (error) {
-                console.error("Error reporting mod:", error);
-                showNotification(translations[currentLanguage].error, 'Failed to submit report.');
-            }
-        });
-    }
-    if (document.getElementById('closeReportModal')) {
-        document.getElementById('closeReportModal').addEventListener('click', () => hideModal('reportModal'));
-    }
-
-    // Profil Pengguna
-    let userProfileListener = null;
-
-    function setupUserProfileListener() {
-      if (userProfileListener) userProfileListener();
-      if (!userId) return;
-
-      const userDocRef = doc(db, "users", userId);
-      userProfileListener = onSnapshot(userDocRef, (doc) => {
-        if (doc.exists()) {
-          const data = doc.data();
-          const profileUsernameEl = document.getElementById('profileUsername');
-          const profileBioEl = document.getElementById('profileBio');
-          const profileEmailEl = document.getElementById('profileEmail');
-          
-          if (profileUsernameEl) profileUsernameEl.value = data.username || '';
-          if (profileBioEl) profileBioEl.value = data.bio || '';
-          if (profileEmailEl) profileEmailEl.textContent = data.email || '';
-          
-          const friendsList = document.getElementById('friendsList');
-          if (friendsList) {
-              friendsList.innerHTML = '';
-              (data.friends || []).forEach(friendId => {
-                  const li = document.createElement('li');
-                  li.textContent = friendId;
-                  friendsList.appendChild(li);
-              });
-          }
+            friends.forEach(friend => {
+                const friendItem = document.createElement('div');
+                friendItem.className = 'bg-gray-700 p-3 rounded-md shadow-sm';
+                friendItem.innerHTML = `<p class="font-bold">${friend.name || 'Anonim'}</p><p class="text-sm text-gray-400">ID: ${friend.id}</p>`;
+                container.appendChild(friendItem);
+            });
         }
-      }, (error) => {
-          console.error("Error fetching user profile: ", error);
-          const profileMessageEl = document.getElementById('profileMessage');
-          if (profileMessageEl) profileMessageEl.textContent = error.message;
-      });
-    }
 
-    function loadUserProfile() {
-      // Data dimuat oleh listener, ini hanya untuk navigasi
-    }
-
-    if (document.getElementById('profileForm')) {
-        document.getElementById('profileForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const newUsername = document.getElementById('profileUsername').value;
-            const newBio = document.getElementById('profileBio').value;
-
-            try {
-                const userDocRef = doc(db, "users", userId);
-                await updateDoc(userDocRef, {
-                    username: newUsername,
-                    bio: newBio
-                });
-                const profileMessageEl = document.getElementById('profileMessage');
-                if (profileMessageEl) profileMessageEl.textContent = translations[currentLanguage].profileUpdateSuccess;
-            } catch (error) {
-                console.error("Error updating profile: ", error);
-                showNotification("Error", 'Failed to update profile.');
-            }
-        });
-    }
-
-    if (document.getElementById('changeEmailPasswordForm')) {
-        document.getElementById('changeEmailPasswordForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const currentPassword = document.getElementById('currentPassword').value;
-            const newPassword = document.getElementById('newPassword').value;
-            const confirmNewPassword = document.getElementById('confirmNewPassword').value;
-            const newEmail = document.getElementById('newEmail').value;
-            const changeEmailPasswordMessageEl = document.getElementById('changeEmailPasswordMessage');
-
-            if (newPassword && newPassword !== confirmNewPassword) {
-                if (changeEmailPasswordMessageEl) changeEmailPasswordMessageEl.textContent = translations[currentLanguage].passwordMismatch;
+        function renderNotifications() {
+            const container = document.getElementById('notifications-list');
+            if (!container) return;
+            container.innerHTML = '';
+            if (notifications.length === 0) {
+                container.innerHTML = `<p class="text-center text-gray-500">Tidak ada notifikasi.</p>`;
                 return;
             }
+            notifications.forEach(notification => {
+                const notificationItem = document.createElement('div');
+                notificationItem.className = 'bg-gray-700 p-3 rounded-md shadow-sm mb-2';
+                notificationItem.innerHTML = `<p class="text-gray-300">${notification.text}</p>`;
+                container.appendChild(notificationItem);
+            });
+        }
 
-            const user = auth.currentUser;
-            const credential = EmailAuthProvider.credential(user.email, currentPassword);
+        // --- Mod Details Pop-up ---
+        window.showModDetails = function(mod) {
+            const modal = document.getElementById('mod-details-modal');
+            const content = document.getElementById('mod-details-content');
+            selectedMod = mod;
 
+            const isFavorited = favoriteMods.includes(mod.id);
+            const isDownloadLater = downloadLaterMods.includes(mod.id);
+
+            content.innerHTML = `
+                <span class="close-button" onclick="window.hideModDetails()">&times;</span>
+                <div class="grid md:grid-cols-2 gap-6">
+                    <div>
+                        <img src="${mod.thumbnail}" alt="${mod.gameTitle}" class="w-full rounded-lg mb-4" />
+                        <div class="grid grid-cols-2 gap-2 mb-4">
+                            ${mod.imageDetails && mod.imageDetails.map((img, index) => `<img src="${img}" alt="${mod.gameTitle} detail ${index}" class="w-full h-32 object-cover rounded-lg" />`).join('')}
+                        </div>
+                        <p class="text-lg mb-2"><span class="font-bold">Penulis:</span> ${mod.authorName || mod.authorId}</p>
+                        <p class="text-sm text-gray-400 mb-4">ID Mod: ${mod.id}</p>
+                    </div>
+                    <div>
+                        <div class="mb-4">
+                            <h3 class="text-xl font-bold mb-2">Deskripsi Mod</h3>
+                            <p class="text-gray-300" style="white-space: pre-wrap;">${mod.description}</p>
+                        </div>
+                        <div class="mb-4">
+                            <h3 class="text-xl font-bold mb-2">Panduan Unduh</h3>
+                            <p class="text-gray-300">${mod.guideline || 'Tidak ada panduan unduh.'}</p>
+                        </div>
+                        <div>
+                            <h3 class="text-xl font-bold mb-2">Kategori</h3>
+                            <span class="bg-blue-600 text-white px-3 py-1 rounded-full text-sm">${mod.category}</span>
+                        </div>
+                        <div class="mt-6 flex space-x-4">
+                             <button onclick="window.toggleFavorite('${mod.id}')" class="button ${isFavorited ? 'bg-red-600' : 'bg-gray-700'} text-white">
+                                ${isFavorited ? t[currentLang].removeFav : t[currentLang].addFav}
+                            </button>
+                            <button onclick="window.toggleDownloadLater('${mod.id}')" class="button ${isDownloadLater ? 'bg-yellow-600' : 'bg-gray-700'} text-white">
+                                ${isDownloadLater ? 'Hapus dari ' + t[currentLang].downloadLater : t[currentLang].downloadLaterBtn}
+                            </button>
+                            <button onclick="window.showReportModal('${mod.id}')" class="button bg-red-600 text-white">${t[currentLang].reportMod}</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            modal.classList.remove('hidden');
+        }
+
+        window.hideModDetails = function() {
+            document.getElementById('mod-details-modal').classList.add('hidden');
+        }
+        
+        window.toggleFavorite = async function(modId) {
+             if (!user) { window.showModal("Silahkan masuk untuk menambahkan ke favorit."); return; }
+             const userDocRef = doc(db, `artifacts/${appId}/users/${userId}/profile`, "data");
+             const newFavorites = favoriteMods.includes(modId)
+                 ? favoriteMods.filter(id => id !== modId)
+                 : [...favoriteMods, modId];
+             await setDoc(userDocRef, { favorites: newFavorites }, { merge: true });
+        }
+
+        window.toggleDownloadLater = async function(modId) {
+             if (!user) { window.showModal("Silahkan masuk untuk menambahkan ke daftar unduh nanti."); return; }
+             const userDocRef = doc(db, `artifacts/${appId}/users/${userId}/profile`, "data");
+             const newDownloadLater = downloadLaterMods.includes(modId)
+                 ? downloadLaterMods.filter(id => id !== modId)
+                 : [...downloadLaterMods, modId];
+             await setDoc(userDocRef, { downloadLater: newDownloadLater }, { merge: true });
+        }
+
+        window.showReportModal = function(modId) {
+            document.getElementById('report-mod-id').value = modId;
+            document.getElementById('report-modal').classList.remove('hidden');
+        }
+
+        window.hideReportModal = function() {
+             document.getElementById('report-modal').classList.add('hidden');
+        }
+
+        // --- Main App Logic ---
+        window.onload = async function() {
             try {
-                await reauthenticateWithCredential(user, credential);
-                if (newEmail) {
-                    await updateEmail(user, newEmail);
+                if (typeof __initial_auth_token !== 'undefined') {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
                 }
-                if (newPassword) {
-                    await updatePassword(user, newPassword);
-                }
-                if (changeEmailPasswordMessageEl) changeEmailPasswordMessageEl.textContent = translations[currentLanguage].profileUpdateSuccess;
             } catch (error) {
-                if (changeEmailPasswordMessageEl) changeEmailPasswordMessageEl.textContent = error.message;
+                console.error("Error during authentication:", error);
             }
-        });
-    }
 
-    // Favorit dan Unduh Nanti
-    async function likeMod(modId) {
-      if (!userId) return showNotification("Error", 'Please log in to add favorites.');
-      try {
-        const modRef = doc(db, "mods", modId);
-        await updateDoc(modRef, {
-          likes: arrayUnion(userId)
-        });
-        const userRef = doc(db, "users", userId);
-        await updateDoc(userRef, {
-            favorites: arrayUnion(modId)
-        });
-        showNotification("Success", 'Added to favorites!');
-      } catch (error) {
-        console.error("Error adding to favorites: ", error);
-      }
-    }
+            onAuthStateChanged(auth, (currentUser) => {
+                user = currentUser;
+                if (currentUser) {
+                    userId = currentUser.uid;
+                    document.getElementById('user-menu-btn').textContent = user.displayName || 'Pengguna';
+                    document.getElementById('auth-nav').classList.add('hidden');
+                    document.getElementById('user-nav').classList.remove('hidden');
+                } else {
+                    userId = null;
+                    document.getElementById('auth-nav').classList.remove('hidden');
+                    document.getElementById('user-nav').classList.add('hidden');
+                }
+                setupDataListeners();
+                document.getElementById('loading-screen').classList.add('hidden');
+            });
+            
+            document.getElementById('language-select').addEventListener('change', (e) => {
+                currentLang = e.target.value;
+                // Di sini Anda bisa mengimplementasikan logika untuk merender ulang semua teks UI
+                // Untuk demo, kita hanya akan memuat ulang data mod
+                renderMods(mods);
+            });
+
+            document.getElementById('search-form').addEventListener('submit', (e) => {
+                 e.preventDefault();
+                 const query = document.getElementById('search-input').value.toLowerCase();
+                 const filteredMods = mods.filter(mod => mod.gameTitle.toLowerCase().includes(query) || mod.description.toLowerCase().includes(query));
+                 window.renderPage('home');
+                 renderMods(filteredMods);
+            });
+
+            // Handle upload form submission
+            document.getElementById('upload-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const form = e.target;
+                const uploadBtn = document.getElementById('upload-submit-btn');
+                
+                if (!user) {
+                    window.showModal("Silahkan masuk untuk mengunggah mod.");
+                    return;
+                }
+
+                uploadBtn.disabled = true;
+                uploadBtn.textContent = 'Mengunggah...';
+
+                const modData = {
+                    gameTitle: form.gameTitle.value,
+                    filesLink: form.filesLink.value,
+                    thumbnail: form.thumbnail.value,
+                    imageDetails: Array.from(form.querySelectorAll('input[name="imageDetails[]"]')).map(input => input.value).filter(img => img),
+                    description: form.description.value,
+                    guideline: form.guideline.value,
+                    category: form.category.value,
+                    exclusive: form.exclusive.checked,
+                    isAuth: form.isAuth.checked,
+                    is18plus: form.is18plus.checked,
+                    authorId: userId,
+                    authorName: user?.displayName || user?.email || 'Anonim',
+                    status: 'pending',
+                    createdAt: serverTimestamp(),
+                    likes: 0
+                };
+                
+                try {
+                    const modsPath = `artifacts/${appId}/public/data/mods`;
+                    const docRef = await addDoc(collection(db, modsPath), modData);
+
+                    const uploadsPath = `artifacts/${appId}/users/${userId}/uploads`;
+                    await setDoc(doc(db, uploadsPath, docRef.id), modData);
+                    
+                    window.showModal("Mod berhasil diunggah! Unggahan Anda akan segera diproses.");
+                    form.reset();
+
+                    setTimeout(async () => {
+                        const updates = { status: 'uploaded' };
+                        await setDoc(doc(db, modsPath, docRef.id), updates, { merge: true });
+                        await setDoc(doc(db, uploadsPath, docRef.id), updates, { merge: true });
+                    }, 5000); // 5 seconds
+                } catch (e) {
+                    console.error("Error adding document: ", e);
+                    window.showModal("Gagal mengunggah mod. Silakan coba lagi.");
+                } finally {
+                    uploadBtn.disabled = false;
+                    uploadBtn.textContent = 'Kirim';
+                }
+            });
+
+            document.getElementById('add-image-detail-btn').addEventListener('click', () => {
+                const container = document.getElementById('image-details-container');
+                const newInput = document.createElement('input');
+                newInput.type = 'url';
+                newInput.name = 'imageDetails[]';
+                newInput.className = 'w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 mt-2 bg-gray-700 border-gray-700 text-gray-200';
+                container.appendChild(newInput);
+            });
+
+            // Profile Form Handling
+            document.getElementById('profile-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const form = e.target;
+                const newName = form.name.value;
+                const newDesc = form.description.value;
+
+                if (user) {
+                    try {
+                        await updateProfile(user, { displayName: newName });
+                        const userDocRef = doc(db, `artifacts/${appId}/users/${userId}/profile`, "data");
+                        await setDoc(userDocRef, { description: newDesc }, { merge: true });
+                        window.showModal("Profil berhasil diperbarui!");
+                    } catch (error) {
+                        console.error("Error updating profile:", error);
+                        window.showModal("Gagal memperbarui profil.");
+                    }
+                }
+            });
+
+            document.getElementById('update-email-form').addEventListener('submit', async (e) => {
+                 e.preventDefault();
+                 const newEmail = e.target.newEmail.value;
+                 const password = e.target.passwordForEmail.value;
+
+                 if (user && newEmail && password) {
+                     const credential = EmailAuthProvider.credential(user.email, password);
+                     try {
+                         await reauthenticateWithCredential(user, credential);
+                         await updateEmail(user, newEmail);
+                         window.showModal("Email berhasil diperbarui!");
+                     } catch (error) {
+                         console.error("Error updating email:", error);
+                         window.showModal("Gagal memperbarui email. Pastikan password lama Anda benar.");
+                     }
+                 }
+            });
+            
+            document.getElementById('update-password-form').addEventListener('submit', async (e) => {
+                 e.preventDefault();
+                 const oldPassword = e.target.oldPassword.value;
+                 const newPassword = e.target.newPassword.value;
+
+                 if (user && oldPassword && newPassword) {
+                      const credential = EmailAuthProvider.credential(user.email, oldPassword);
+                     try {
+                         await reauthenticateWithCredential(user, credential);
+                         await updatePassword(user, newPassword);
+                         window.showModal("Password berhasil diperbarui!");
+                     } catch (error) {
+                         console.error("Error updating password:", error);
+                         window.showModal("Gagal memperbarui password. Pastikan password lama Anda benar.");
+                     }
+                 }
+            });
+
+            // Report Mod Form Handling
+            document.getElementById('report-form').addEventListener('submit', async (e) => {
+                 e.preventDefault();
+                 const modId = document.getElementById('report-mod-id').value;
+                 const reportReason = document.getElementById('report-reason').value;
+
+                 if (!user) { window.showModal("Silahkan login untuk melaporkan mod."); return; }
+                 if (!modId || !reportReason) { window.showModal("ID Mod dan alasan tidak boleh kosong."); return; }
+
+                 try {
+                     const reportsPath = `artifacts/${appId}/public/data/reports`;
+                     await addDoc(collection(db, reportsPath), {
+                         modId: modId,
+                         reporterId: userId,
+                         reason: reportReason,
+                         timestamp: serverTimestamp()
+                     });
+                     window.showModal("Laporan berhasil dikirim!");
+                     window.hideReportModal();
+                 } catch (error) {
+                     console.error("Error submitting report:", error);
+                     window.showModal("Gagal mengirim laporan.");
+                 }
+            });
+
+            // Add Friend Form Handling
+            document.getElementById('add-friend-form').addEventListener('submit', async (e) => {
+                 e.preventDefault();
+                 const friendId = e.target.friendId.value;
+
+                 if (!user) { window.showModal("Silahkan login untuk menambah teman."); return; }
+                 if (!friendId) { window.showModal("ID Teman tidak boleh kosong."); return; }
+
+                 try {
+                     const userDocRef = doc(db, `artifacts/${appId}/users/${userId}/profile`, "data");
+                     await setDoc(userDocRef, { friends: arrayUnion({ id: friendId, status: 'pending' }) }, { merge: true });
+                     window.showModal("Permintaan pertemanan berhasil dikirim!");
+                 } catch (error) {
+                     console.error("Error adding friend:", error);
+                     window.showModal("Gagal menambah teman.");
+                 }
+            });
+        };
+    </script>
+
+    <!-- Modal Konfirmasi Unggah & Info Lainnya -->
+    <div id="info-modal" class="modal-overlay hidden">
+        <div class="modal-content text-center">
+            <span class="close-button" onclick="window.closeModal()">&times;</span>
+            <p id="modal-message" class="text-xl"></p>
+            <button onclick="window.closeModal()" class="mt-4 button btn-primary">Tutup</button>
+        </div>
+    </div>
     
-    async function unlikeMod(modId) {
-      if (!userId) return;
-      try {
-        const modRef = doc(db, "mods", modId);
-        await updateDoc(modRef, {
-          likes: arrayRemove(userId)
-        });
-        const userRef = doc(db, "users", userId);
-        await updateDoc(userRef, {
-            favorites: arrayRemove(modId)
-        });
-        showNotification("Success", 'Removed from favorites!');
-      } catch (error) {
-        console.error("Error removing from favorites: ", error);
-      }
-    }
-
-    async function addDownloadLater(modId) {
-      if (!userId) return showNotification("Error", 'Please log in to save mods for later.');
-      try {
-        const userRef = doc(db, "users", userId);
-        await updateDoc(userRef, {
-          downloadLater: arrayUnion(modId)
-        });
-        showNotification("Success", 'Added to download later!');
-      } catch (error) {
-        console.error("Error adding to download later: ", error);
-      }
-    }
-
-    async function removeDownloadLater(modId) {
-      if (!userId) return;
-      try {
-        const userRef = doc(db, "users", userId);
-        await updateDoc(userRef, {
-          downloadLater: arrayRemove(modId)
-        });
-        showNotification("Success", 'Removed from download later!');
-      } catch (error) {
-        console.error("Error removing from download later: ", error);
-      }
-    }
-
-    function loadFavoriteMods() {
-      const favoritesContainer = document.getElementById('favoritesList');
-      if (!favoritesContainer) return;
-      if (!userId) {
-          favoritesContainer.innerHTML = `<p class="text-center text-red-500">Please log in to see your favorites.</p>`;
-          return;
-      }
-
-      const userRef = doc(db, "users", userId);
-      onSnapshot(userRef, async (userDoc) => {
-        if (userDoc.exists()) {
-          const favorites = userDoc.data().favorites || [];
-          if (favorites.length === 0) {
-            favoritesContainer.innerHTML = `<p class="text-center text-gray-500" data-i18n="noModsFound"></p>`;
-            updateText();
-            return;
-          }
-          const modPromises = favorites.map(modId => getDoc(doc(db, "mods", modId)));
-          const modDocs = await Promise.all(modPromises);
-          const favoriteMods = modDocs.filter(doc => doc.exists()).map(doc => ({ id: doc.id, ...doc.data() }));
-          displayMods(favoriteMods, favoritesContainer);
-        }
-      }, (error) => {
-          console.error("Error fetching favorites: ", error);
-          favoritesContainer.innerHTML = `<p class="text-center text-red-500">${error.message}</p>`;
-      });
-    }
-    
-    function loadDownloadLaterMods() {
-      const downloadLaterContainer = document.getElementById('downloadLaterList');
-      if (!downloadLaterContainer) return;
-      if (!userId) {
-          downloadLaterContainer.innerHTML = `<p class="text-center text-red-500">Please log in to see your mods for later download.</p>`;
-          return;
-      }
-
-      const userRef = doc(db, "users", userId);
-      onSnapshot(userRef, async (userDoc) => {
-        if (userDoc.exists()) {
-          const downloadLater = userDoc.data().downloadLater || [];
-          if (downloadLater.length === 0) {
-            downloadLaterContainer.innerHTML = `<p class="text-center text-gray-500" data-i18n="noModsFound"></p>`;
-            updateText();
-            return;
-          }
-          const modPromises = downloadLater.map(modId => getDoc(doc(db, "mods", modId)));
-          const modDocs = await Promise.all(modPromises);
-          const modsToDownloadLater = modDocs.filter(doc => doc.exists()).map(doc => ({ id: doc.id, ...doc.data() }));
-          displayMods(modsToDownloadLater, downloadLaterContainer);
-        }
-      }, (error) => {
-          console.error("Error fetching download later mods: ", error);
-          downloadLaterContainer.innerHTML = `<p class="text-center text-red-500">${error.message}</p>`;
-      });
-    }
-
-    // --- Main ---
-    window.onload = async function() {
-        try {
-            if (__initial_auth_token) {
-                await signInWithCustomToken(auth, __initial_auth_token);
-            } else {
-                await signInAnonymously(auth);
-            }
-        } catch (error) {
-            console.error("Firebase Auth Error:", error);
-        }
-        updateText();
-    };
-  </script>
-</head>
-
-<body class="bg-gray-900 text-white font-sans">
-  <!-- Navigasi Atas -->
-  <header class="bg-gray-800 shadow-md p-4 flex flex-col sm:flex-row justify-between items-center fixed w-full top-0 z-50">
-    <div class="flex items-center mb-4 sm:mb-0">
-      <h1 class="text-2xl font-bold text-blue-400 mr-8">Mod Portal</h1>
-      <div class="hidden md:flex space-x-4">
-        <a href="#" class="hover:text-blue-400 transition-colors duration-200" id="navHome" onclick="navigateTo('home')" data-i18n="home">Beranda</a>
-        <a href="#" class="hover:text-blue-400 transition-colors duration-200" id="navUpload" onclick="navigateTo('upload')" data-i18n="uploadMods">Unggah Mod</a>
-      </div>
+    <!-- Modal Detail Mod -->
+    <div id="mod-details-modal" class="modal-overlay hidden">
+        <div id="mod-details-content" class="modal-content">
+            <!-- Konten detail mod akan di-render di sini oleh JS -->
+        </div>
     </div>
 
-    <div class="flex items-center space-x-4">
-      <div class="relative w-full sm:w-auto">
-        <input type="text" id="searchInput" placeholder="Cari mod..." data-i18n="search" class="w-full sm:w-64 p-2 pl-10 rounded-md bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-      </div>
-      <button id="notificationButton" class="relative p-2 rounded-full hover:bg-gray-700 transition-colors duration-200">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
-        <span class="absolute top-1 right-1 h-2 w-2 bg-red-500 rounded-full"></span>
-      </button>
-      <select id="languageSelect" class="bg-gray-700 text-white p-2 rounded-md">
-        <option value="en">English</option>
-        <option value="id" selected>Indonesia</option>
-        <option value="ru">Russia</option>
-      </select>
-      
-      <!-- Dropdown Profil -->
-      <div id="profileDropdown" class="relative hidden">
-        <button id="profileButton" onclick="toggleProfileDropdown()" class="p-2 px-4 rounded-md bg-blue-500 hover:bg-blue-600 transition-colors duration-200 flex items-center space-x-2" data-i18n="profile">
-          Profil
-          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-        </button>
-        <div id="profileDropdownMenu" class="absolute right-0 mt-2 w-48 bg-gray-700 rounded-md shadow-lg py-1 hidden z-20">
-          <a href="#" class="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-600" id="navProfile" onclick="navigateTo('profile')" data-i18n="profile">Profil</a>
-          <a href="#" class="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-600" id="navMyUploads" onclick="navigateTo('myUploads')" data-i18n="myUploads">Unggahan Saya</a>
-          <a href="#" class="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-600" id="navFavorites" onclick="navigateTo('favorites')" data-i18n="favorites">Mod Favorit</a>
-          <a href="#" class="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-600" id="navDownloadLater" onclick="navigateTo('downloadLater')" data-i18n="downloadLater">Unduh Nanti</a>
-          <a href="#" class="block px-4 py-2 text-sm text-red-400 hover:bg-gray-600" id="navLogout" data-i18n="logout">Keluar</a>
+    <!-- Modal Report -->
+    <div id="report-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <span class="close-button" onclick="window.hideReportModal()">&times;</span>
+            <h3 class="text-2xl font-bold mb-4">Laporkan Mod</h3>
+            <form id="report-form" class="space-y-4">
+                <input type="text" id="report-mod-id" placeholder="ID Mod" readonly class="w-full p-2 border rounded-md" />
+                <textarea id="report-reason" rows="4" placeholder="Alasan melaporkan mod ini..." class="w-full p-2 border rounded-md" required></textarea>
+                <button type="submit" class="w-full py-2 button btn-primary">Kirim Laporan</button>
+            </form>
         </div>
-      </div>
-      
-      <a href="#" class="p-2 px-4 rounded-md bg-blue-500 hover:bg-blue-600 transition-colors duration-200 hidden" id="navLogin" onclick="navigateTo('login')" data-i18n="login">Masuk</a>
-      <a href="#" class="p-2 px-4 rounded-md bg-green-500 hover:bg-green-600 transition-colors duration-200 hidden" id="navRegister" onclick="navigateTo('register')" data-i18n="register">Daftar</a>
     </div>
-  </header>
-
-  <!-- Konten Utama -->
-  <main class="container mx-auto p-4 pt-28">
-    <!-- Halaman Beranda -->
-    <section id="homePage" class="space-y-8">
-      <h2 class="text-3xl font-bold text-white text-center" data-i18n="welcome">Selamat datang di Portal Mod!</h2>
-      <h3 class="text-2xl font-bold text-white mb-4" data-i18n="latestMods">Mod Terbaru</h3>
-      <div id="modsList" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <!-- Mod akan dimuat di sini -->
-      </div>
-    </section>
-
-    <!-- Halaman Unggah Mod -->
-    <section id="uploadPage" class="hidden space-y-4 max-w-2xl mx-auto p-6 bg-gray-800 rounded-lg shadow-xl">
-      <h2 class="text-3xl font-bold text-white mb-4" data-i18n="uploadMods">Unggah Mod</h2>
-      <p class="text-sm text-gray-400 mb-4" data-i18n="rules">Ini adalah area di mana Anda bisa menjelaskan aturan-aturan pengunggahan mod. Misalnya, tidak ada konten ilegal, hak cipta, dan lain-lain.</p>
-      <form id="uploadForm" class="space-y-4">
-        <div>
-          <label for="gameTitle" class="block text-sm font-medium mb-1" data-i18n="gameTitle">Judul Game</label>
-          <input type="text" id="gameTitle" name="gameTitle" required class="w-full p-2 rounded-md bg-gray-600 text-white border border-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
-        </div>
-        <div>
-          <label for="filesLink" class="block text-sm font-medium mb-1" data-i18n="filesLink">Tautan Berkas (Eksternal)</label>
-          <input type="url" id="filesLink" name="filesLink" required class="w-full p-2 rounded-md bg-gray-600 text-white border border-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
-        </div>
-        <div>
-          <label for="thumbnail" class="block text-sm font-medium mb-1" data-i18n="thumbnail">URL Gambar Thumbnail</label>
-          <input type="url" id="thumbnail" name="thumbnail" class="w-full p-2 rounded-md bg-gray-600 text-white border border-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
-        </div>
-        <div>
-          <label class="block text-sm font-medium mb-1" data-i18n="imageDetails">URL Gambar Detail</label>
-          <div id="imageDetailsContainer" class="space-y-2">
-            <input type="url" class="w-full p-2 rounded-md bg-gray-600 text-white border border-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="URL Gambar 1">
-          </div>
-          <button type="button" id="addImageDetails" class="mt-2 text-blue-400 hover:text-blue-300 font-semibold text-sm">+ Tambah Gambar</button>
-        </div>
-        <div>
-          <label for="description" class="block text-sm font-medium mb-1" data-i18n="description">Deskripsi Mod</label>
-          <textarea id="description" name="description" rows="5" class="w-full p-2 rounded-md bg-gray-600 text-white border border-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
-        </div>
-        <div>
-          <label for="downloadGuide" class="block text-sm font-medium mb-1" data-i18n="downloadGuide">Panduan Unduh</label>
-          <textarea id="downloadGuide" name="downloadGuide" rows="3" class="w-full p-2 rounded-md bg-gray-600 text-white border border-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Isi petunjuk unduh atau tautan eksternal"></textarea>
-        </div>
-        <div>
-          <label for="category" class="block text-sm font-medium mb-1" data-i18n="modCategory">Kategori</label>
-          <select id="category" name="category" class="w-full p-2 rounded-md bg-gray-600 text-white border border-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <option value="tutorial" data-i18n="tutorial">Tutorial</option>
-            <option value="mod" data-i18n="mod">Mod</option>
-            <option value="modpack" data-i18n="modpack">Modpack</option>
-          </select>
-        </div>
-        <div class="flex items-center space-x-4">
-          <label class="flex items-center space-x-2 text-sm">
-            <input type="checkbox" id="exclusive" name="exclusive" class="rounded text-blue-500">
-            <span data-i18n="exclusive">Mod Eksklusif</span>
-          </label>
-          <label class="flex items-center space-x-2 text-sm">
-            <input type="checkbox" id="authorCheck" name="authorCheck" class="rounded text-blue-500">
-            <span data-i18n="author">Saya adalah Penulis</span>
-          </label>
-          <label class="flex items-center space-x-2 text-sm">
-            <input type="checkbox" id="matureContent" name="matureContent" class="rounded text-red-500">
-            <span data-i18n="matureContent">18+ / Konten Sensitif</span>
-          </label>
-        </div>
-        <button type="submit" class="w-full p-3 bg-blue-500 hover:bg-blue-600 rounded-md font-bold transition-colors duration-200" data-i18n="submit">Kirim</button>
-      </form>
-      <p id="uploadMessage" class="text-center mt-4 text-green-400"></p>
-    </section>
-
-    <!-- Halaman Unggahan Saya -->
-    <section id="myUploadsPage" class="hidden space-y-4 max-w-4xl mx-auto p-6 bg-gray-800 rounded-lg shadow-xl">
-      <h2 class="text-3xl font-bold text-white mb-4" data-i18n="yourUploads">Unggahan Saya</h2>
-      <div id="myUploadsList" class="space-y-4">
-        <!-- Unggahan mod akan dimuat di sini -->
-      </div>
-    </section>
     
-    <!-- Halaman Mod Favorit -->
-    <section id="favoritesPage" class="hidden space-y-8">
-      <h2 class="text-3xl font-bold text-white mb-4 text-center" data-i18n="favorites">Mod Favorit</h2>
-      <div id="favoritesList" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <!-- Mod favorit akan dimuat di sini -->
-      </div>
-    </section>
-
-    <!-- Halaman Unduh Nanti -->
-    <section id="downloadLaterPage" class="hidden space-y-8">
-      <h2 class="text-3xl font-bold text-white mb-4 text-center" data-i18n="downloadLater">Unduh Nanti</h2>
-      <div id="downloadLaterList" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <!-- Mod Unduh Nanti akan dimuat di sini -->
-      </div>
-    </section>
-
-    <!-- Halaman Profil -->
-    <section id="profilePage" class="hidden space-y-6 max-w-2xl mx-auto p-6 bg-gray-800 rounded-lg shadow-xl">
-      <h2 class="text-3xl font-bold text-white mb-4" data-i18n="accountProfile">Profil Akun</h2>
-      
-      <!-- Formulir Profil -->
-      <form id="profileForm" class="space-y-4">
-        <div>
-          <label for="profileUsername" class="block text-sm font-medium mb-1" data-i18n="username">Nama Pengguna</label>
-          <input type="text" id="profileUsername" class="w-full p-2 rounded-md bg-gray-600 text-white border border-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
+    <!-- Header -->
+    <div class="header shadow-md">
+        <div class="container flex justify-between items-center py-4">
+            <h1 class="text-3xl font-bold text-white">ModsDown</h1>
+            <nav class="flex items-center space-x-4">
+                <button onclick="window.renderPage('home')" class="text-white hover:text-gray-400 mx-2">Beranda</button>
+                <button onclick="window.renderPage('upload-mod')" class="text-white hover:text-gray-400 mx-2">Unggah Mod</button>
+                <form id="search-form" class="flex">
+                    <input type="text" id="search-input" placeholder="Cari..." class="p-2 border rounded-md bg-gray-700 text-gray-200" />
+                    <button type="submit" class="ml-2 button btn-primary">Cari</button>
+                </form>
+                <select id="language-select" class="p-2 border rounded-md bg-gray-700 text-gray-200">
+                    <option value="id">Indonesia</option>
+                    <option value="en">English</option>
+                    <option value="ru">Русский</option>
+                </select>
+                <!-- Navigasi untuk pengguna yang belum login -->
+                <div id="auth-nav">
+                     <button onclick="/* login logic */" class="text-white hover:text-gray-400 mx-2">Masuk</button>
+                     <button onclick="/* register logic */" class="text-white hover:text-gray-400 mx-2">Daftar</button>
+                </div>
+                <!-- Navigasi untuk pengguna yang sudah login -->
+                <div id="user-nav" class="relative hidden">
+                    <button id="user-menu-btn" class="text-white hover:text-gray-400 mx-2" onclick="document.getElementById('user-menu').classList.toggle('hidden')">
+                        Pengguna
+                    </button>
+                    <div id="user-menu" class="absolute right-0 mt-2 w-48 bg-gray-700 rounded-md shadow-xl hidden z-50">
+                        <a href="#" onclick="window.renderPage('profile')" class="block px-4 py-2 text-sm text-gray-200 hover:bg-gray-600">Profil</a>
+                        <a href="#" onclick="window.renderPage('my-uploads')" class="block px-4 py-2 text-sm text-gray-200 hover:bg-gray-600">Unggahan Saya</a>
+                        <a href="#" onclick="window.renderPage('favorites')" class="block px-4 py-2 text-sm text-gray-200 hover:bg-gray-600">Mod Favorit</a>
+                        <a href="#" onclick="window.renderPage('download-later')" class="block px-4 py-2 text-sm text-gray-200 hover:bg-gray-600">Unduh Nanti</a>
+                        <a href="#" onclick="window.renderPage('friends')" class="block px-4 py-2 text-sm text-gray-200 hover:bg-gray-600">Teman Saya</a>
+                        <a href="#" onclick="window.renderPage('notifications')" class="block px-4 py-2 text-sm text-gray-200 hover:bg-gray-600">Notifikasi</a>
+                        <a href="#" onclick="signOut(auth)" class="block px-4 py-2 text-sm text-red-400 hover:bg-gray-600">Keluar</a>
+                    </div>
+                </div>
+            </nav>
         </div>
-        <div>
-          <label for="profileBio" class="block text-sm font-medium mb-1" data-i18n="bio">Bio</label>
-          <textarea id="profileBio" rows="3" class="w-full p-2 rounded-md bg-gray-600 text-white border border-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
-        </div>
-        <button type="submit" class="w-full p-3 bg-blue-500 hover:bg-blue-600 rounded-md font-bold transition-colors duration-200" data-i18n="updateProfile">Perbarui Profil</button>
-        <p id="profileMessage" class="text-center mt-2 text-green-400"></p>
-      </form>
+    </div>
 
-      <hr class="my-6 border-gray-700">
-      
-      <!-- Formulir Perbarui Email & Kata Sandi -->
-      <form id="changeEmailPasswordForm" class="space-y-4">
-        <h3 class="text-2xl font-bold text-white">Ubah Email & Kata Sandi</h3>
-        <div>
-          <label for="profileEmail" class="block text-sm font-medium mb-1" data-i18n="email">Email</label>
-          <p id="profileEmail" class="w-full p-2 rounded-md bg-gray-700 text-gray-300"></p>
-        </div>
-        <div>
-          <label for="newEmail" class="block text-sm font-medium mb-1" data-i18n="email">Email Baru (opsional)</label>
-          <input type="email" id="newEmail" class="w-full p-2 rounded-md bg-gray-600 text-white border border-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
-        </div>
-        <div>
-          <label for="currentPassword" class="block text-sm font-medium mb-1" data-i18n="currentPassword">Kata Sandi Saat Ini</label>
-          <input type="password" id="currentPassword" required class="w-full p-2 rounded-md bg-gray-600 text-white border border-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
-        </div>
-        <div>
-          <label for="newPassword" class="block text-sm font-medium mb-1" data-i18n="newPassword">Kata Sandi Baru (opsional)</label>
-          <input type="password" id="newPassword" class="w-full p-2 rounded-md bg-gray-600 text-white border border-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
-        </div>
-        <div>
-          <label for="confirmNewPassword" class="block text-sm font-medium mb-1">Konfirmasi Kata Sandi Baru</label>
-          <input type="password" id="confirmNewPassword" class="w-full p-2 rounded-md bg-gray-600 text-white border border-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
-        </div>
-        <button type="submit" class="w-full p-3 bg-blue-500 hover:bg-blue-600 rounded-md font-bold transition-colors duration-200" data-i18n="updateProfile">Perbarui</button>
-        <p id="changeEmailPasswordMessage" class="text-center mt-2 text-green-400"></p>
-      </form>
-      
-      <hr class="my-6 border-gray-700">
+    <!-- Konten Utama -->
+    <main class="container min-h-screen">
+        <!-- Loading Screen -->
+        <div id="loading-screen" class="text-center text-gray-400 p-8">Memuat...</div>
 
-      <!-- Daftar Teman -->
-      <div class="space-y-2">
-        <h3 class="text-2xl font-bold text-white" data-i18n="myFriends">Teman Saya</h3>
-        <ul id="friendsList" class="list-disc pl-5 text-gray-300">
-          <!-- Daftar teman akan dimuat di sini -->
-        </ul>
-      </div>
+        <!-- Halaman Beranda -->
+        <div id="home" class="py-8">
+            <h2 class="text-2xl font-bold mb-6 text-white">Mod Terbaru</h2>
+            <div id="mod-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                <!-- Kartu mod akan di-render di sini oleh JS -->
+            </div>
+        </div>
 
-    </section>
+        <!-- Halaman Unggah Mod -->
+        <div id="upload-mod" class="hidden py-8">
+            <h2 class="text-2xl font-bold mb-6 text-white">Unggah Mod Baru</h2>
+            <form id="upload-form" class="bg-gray-800 p-6 rounded-lg shadow-lg">
+                <div class="mb-4">
+                    <label class="block text-gray-200 font-bold mb-2">Judul Game</label>
+                    <input type="text" name="gameTitle" class="w-full p-2 border rounded-md" required />
+                </div>
+                <div class="mb-4">
+                    <label class="block text-gray-200 font-bold mb-2">Kategori</label>
+                    <select name="category" class="w-full p-2 border rounded-md">
+                        <option value="Mods">Mods</option>
+                        <option value="Tutorial">Tutorial</option>
+                        <option value="Modpack">Modpack</option>
+                    </select>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-gray-200 font-bold mb-2">Tautan Eksternal File</label>
+                    <input type="url" name="filesLink" class="w-full p-2 border rounded-md" required />
+                </div>
+                <div class="mb-4">
+                    <label class="block text-gray-200 font-bold mb-2">Panduan Unduh</label>
+                    <textarea name="guideline" rows="2" placeholder="Panduan cara mengunduh, menginstal, atau catatan penting lainnya." class="w-full p-2 border rounded-md"></textarea>
+                </div>
+                <div class="mb-4">
+                    <h3 class="text-xl font-bold text-white">Aturan Unggah Mod</h3>
+                    <p class="text-sm text-gray-400">Pastikan file tidak mengandung virus atau malware. Konten dewasa harus diberi label. Dilarang mengunggah konten ilegal. Konten terkait politik, rasisme, atau kebencian dilarang.</p>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-gray-200 font-bold mb-2">Gambar Thumbnail</label>
+                    <input type="url" name="thumbnail" class="w-full p-2 border rounded-md" required />
+                </div>
+                <div class="mb-4">
+                    <label class="block text-gray-200 font-bold mb-2">Gambar Detail</label>
+                    <div id="image-details-container">
+                        <input type="url" name="imageDetails[]" class="w-full p-2 border rounded-md" />
+                    </div>
+                    <button type="button" id="add-image-detail-btn" class="mt-2 button btn-primary">Tambah Gambar Lain</button>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-gray-200 font-bold mb-2">Deskripsi Mod</label>
+                    <textarea name="description" rows="4" class="w-full p-2 border rounded-md" required></textarea>
+                </div>
+                <div class="flex flex-col space-y-2 mb-4">
+                    <label class="flex items-center text-gray-200">
+                        <input type="checkbox" name="exclusive" class="mr-2" />
+                        <span>Eksklusif</span>
+                    </label>
+                    <label class="flex items-center text-gray-200">
+                        <input type="checkbox" name="isAuth" class="mr-2" />
+                        <span>Ini karya saya</span>
+                    </label>
+                    <label class="flex items-center text-gray-200">
+                        <input type="checkbox" name="is18plus" class="mr-2" />
+                        <span>18+</span>
+                    </label>
+                </div>
+                <button type="submit" id="upload-submit-btn" class="w-full py-3 button btn-primary">
+                    Kirim
+                </button>
+            </form>
+        </div>
 
-    <!-- Halaman Login -->
-    <section id="loginPage" class="hidden flex items-center justify-center min-h-screen">
-      <div class="bg-gray-800 p-8 rounded-lg shadow-xl w-full max-w-sm">
-        <h2 class="text-3xl font-bold text-white mb-6 text-center" data-i18n="loginTitle">Masuk ke akun Anda</h2>
-        <form id="loginForm" class="space-y-4">
-          <div>
-            <label for="loginEmail" class="block text-sm font-medium mb-1" data-i18n="email">Email</label>
-            <input type="email" id="loginEmail" placeholder="Alamat email" data-i18n="emailPlaceholder" required class="w-full p-3 rounded-md bg-gray-600 text-white border border-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
-          </div>
-          <div>
-            <label for="loginPassword" class="block text-sm font-medium mb-1" data-i18n="password">Kata Sandi</label>
-            <input type="password" id="loginPassword" placeholder="Kata sandi" data-i18n="passwordPlaceholder" required class="w-full p-3 rounded-md bg-gray-600 text-white border border-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
-          </div>
-          <button type="submit" class="w-full p-3 bg-blue-500 hover:bg-blue-600 rounded-md font-bold transition-colors duration-200" data-i18n="login">Masuk</button>
-        </form>
-        <p id="loginError" class="text-center mt-4 text-red-400"></p>
-        <p class="text-center text-gray-400 mt-4"><span data-i18n="noAccount">Belum punya akun?</span> <a href="#" onclick="navigateTo('register')" class="text-blue-400 hover:underline">Daftar</a></p>
-      </div>
-    </section>
-
-    <!-- Halaman Registrasi -->
-    <section id="registerPage" class="hidden flex items-center justify-center min-h-screen">
-      <div class="bg-gray-800 p-8 rounded-lg shadow-xl w-full max-w-sm">
-        <h2 class="text-3xl font-bold text-white mb-6 text-center" data-i18n="registerTitle">Buat akun baru</h2>
-        <form id="registerForm" class="space-y-4">
-          <div>
-            <label for="registerEmail" class="block text-sm font-medium mb-1" data-i18n="email">Email</label>
-            <input type="email" id="registerEmail" placeholder="Alamat email" data-i18n="emailPlaceholder" required class="w-full p-3 rounded-md bg-gray-600 text-white border border-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
-          </div>
-          <div>
-            <label for="registerPassword" class="block text-sm font-medium mb-1" data-i18n="password">Kata Sandi</label>
-            <input type="password" id="registerPassword" placeholder="Kata sandi" data-i18n="passwordPlaceholder" required class="w-full p-3 rounded-md bg-gray-600 text-white border border-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
-          </div>
-          <button type="submit" class="w-full p-3 bg-green-500 hover:bg-green-600 rounded-md font-bold transition-colors duration-200" data-i18n="register">Daftar</button>
-        </form>
-        <p id="registerError" class="text-center mt-4 text-red-400"></p>
-        <p class="text-center text-gray-400 mt-4"><span data-i18n="alreadyAccount">Sudah punya akun?</span> <a href="#" onclick="navigateTo('login')" class="text-blue-400 hover:underline">Masuk</a></p>
-      </div>
-    </section>
-
-    <!-- Mod Details Modal -->
-    <div id="modDetailsModal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 z-[100] items-center justify-center p-4">
-      <div class="bg-gray-800 rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6 relative">
-        <button id="closeModDetails" class="absolute top-4 right-4 text-gray-400 hover:text-white">&times;</button>
-        <h2 id="modDetailsTitle" class="text-3xl font-bold text-white mb-2"></h2>
-        <p id="modDetailsAuthor" class="text-sm text-gray-400"></p>
-        <p id="modDetailsId" class="text-xs text-gray-500 mb-4"></p>
-        <div class="flex items-center space-x-2 mb-4">
-          <span id="modDetailsCategory" class="bg-blue-600 text-white text-xs font-semibold px-2 py-1 rounded-full"></span>
-          <button id="likeModButton" class="bg-yellow-500 hover:bg-yellow-600 text-white text-xs font-semibold py-1 px-2 rounded-md" data-i18n="addToFavorites"></button>
-          <button id="downloadLaterButton" class="bg-purple-500 hover:bg-purple-600 text-white text-xs font-semibold py-1 px-2 rounded-md" data-i18n="addToDownloadLater"></button>
+        <!-- Halaman Unggahan Saya -->
+        <div id="my-uploads" class="hidden py-8">
+            <h2 class="text-2xl font-bold mb-6 text-white">Unggahan Saya</h2>
+            <div class="bg-gray-800 rounded-lg shadow-lg overflow-x-auto">
+                <table class="min-w-full text-gray-200">
+                    <thead>
+                        <tr>
+                            <th class="px-6 py-3 border-b border-gray-700 text-left text-sm leading-4 font-medium">Judul Game</th>
+                            <th class="px-6 py-3 border-b border-gray-700 text-left text-sm leading-4 font-medium">Status</th>
+                            <th class="px-6 py-3 border-b border-gray-700 text-left text-sm leading-4 font-medium">Deskripsi</th>
+                            <th class="px-6 py-3 border-b border-gray-700 text-left text-sm leading-4 font-medium">Penulis</th>
+                            <th class="px-6 py-3 border-b border-gray-700 text-left text-sm leading-4 font-medium">ID Mod</th>
+                        </tr>
+                    </thead>
+                    <tbody id="my-uploads-table-body">
+                        <!-- My uploaded mods will be rendered here by JS -->
+                    </tbody>
+                </table>
+            </div>
         </div>
         
-        <div id="modDetailsImages" class="space-y-4 mb-4">
-          <!-- Gambar detail akan dimuat di sini -->
+        <!-- Halaman Profil -->
+        <div id="profile" class="hidden py-8">
+            <h2 class="text-2xl font-bold mb-6 text-white">Profil Pengguna</h2>
+            <div class="bg-gray-800 p-6 rounded-lg shadow-lg space-y-6">
+                <form id="profile-form">
+                    <div class="mb-4">
+                        <label class="block text-gray-200 font-bold mb-2">Nama</label>
+                        <input type="text" name="name" id="profile-name" class="w-full p-2 border rounded-md" value="${user?.displayName || ''}" />
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-gray-200 font-bold mb-2">Deskripsi</label>
+                        <textarea name="description" id="profile-desc" rows="4" class="w-full p-2 border rounded-md"></textarea>
+                    </div>
+                    <button type="submit" class="button btn-primary">Simpan Profil</button>
+                </form>
+                <div class="border-t border-gray-700 pt-6">
+                    <h3 class="text-xl font-bold mb-4 text-white">Pengaturan Akun</h3>
+                    <div class="mb-4">
+                        <p class="font-bold">Email:</p>
+                        <p id="profile-email" class="text-gray-400">${user?.email || 'Tidak ada email'}</p>
+                        <form id="update-email-form" class="mt-2 space-y-2">
+                             <input type="email" name="newEmail" placeholder="Email baru" class="p-2 border rounded-md" required/>
+                             <input type="password" name="passwordForEmail" placeholder="Password lama" class="p-2 border rounded-md" required/>
+                             <button type="submit" class="button btn-primary">Ubah Email</button>
+                        </form>
+                    </div>
+                    <div>
+                        <p class="font-bold">Kata Sandi: <span class="text-gray-500">********</span></p>
+                        <form id="update-password-form" class="mt-2 space-y-2">
+                            <input type="password" name="oldPassword" placeholder="Password lama" class="p-2 border rounded-md" required/>
+                            <input type="password" name="newPassword" placeholder="Password baru" class="p-2 border rounded-md" required/>
+                            <button type="submit" class="button btn-primary">Ubah Password</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
         </div>
 
-        <p id="modDetailsDescription" class="text-gray-300 mb-6"></p>
+        <!-- Halaman Mod Favorit -->
+        <div id="favorites" class="hidden py-8">
+            <h2 class="text-2xl font-bold mb-6 text-white">Mod Favorit</h2>
+            <div id="favorites-mod-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                <!-- Mod favorit akan di-render di sini -->
+            </div>
+        </div>
+
+        <!-- Halaman Unduh Nanti -->
+        <div id="download-later" class="hidden py-8">
+            <h2 class="text-2xl font-bold mb-6 text-white">Unduh Nanti</h2>
+            <div id="download-later-mod-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                <!-- Mod unduh nanti akan di-render di sini -->
+            </div>
+        </div>
         
-        <div id="modDetailsDownloadGuide" class="bg-gray-700 p-4 rounded-md mb-6">
-          <!-- Panduan unduh akan dimuat di sini -->
+        <!-- Halaman Teman Saya -->
+        <div id="friends" class="hidden py-8">
+            <h2 class="text-2xl font-bold mb-6 text-white">Teman Saya</h2>
+            <div id="friends-list" class="space-y-4">
+                <!-- Daftar teman akan di-render di sini -->
+            </div>
+             <form id="add-friend-form" class="mt-4 flex space-x-2">
+                <input type="text" name="friendId" placeholder="ID Teman" class="p-2 border rounded-md flex-grow" required />
+                <button type="submit" class="button btn-primary">Tambah Teman</button>
+            </form>
         </div>
 
-        <div class="flex justify-between items-center mb-6">
-          <button id="modDetailsDownloadButton" class="p-3 bg-green-500 hover:bg-green-600 rounded-md font-bold transition-colors duration-200" data-i18n="download">Unduh</button>
-          <button id="reportModButton" class="p-2 bg-red-500 hover:bg-red-600 rounded-md text-sm font-bold transition-colors duration-200" data-i18n="reportMod">Laporkan</button>
+        <!-- Halaman Notifikasi -->
+        <div id="notifications" class="hidden py-8">
+             <h2 class="text-2xl font-bold mb-6 text-white">Notifikasi</h2>
+             <div id="notifications-list" class="space-y-4">
+                 <!-- Daftar notifikasi akan di-render di sini -->
+             </div>
         </div>
+    </main>
 
-        <!-- Bagian Komentar -->
-        <div>
-          <h3 class="text-xl font-bold mb-4" data-i18n="comments">Komentar</h3>
-          <div id="commentsContainer" class="max-h-60 overflow-y-auto space-y-2 mb-4">
-            <!-- Komentar akan dimuat di sini -->
-          </div>
-          <form id="commentForm">
-            <textarea id="commentInput" rows="3" class="w-full p-2 rounded-md bg-gray-600 text-white border border-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Tambahkan komentar..."></textarea>
-            <button type="submit" class="w-full p-2 mt-2 bg-blue-500 hover:bg-blue-600 rounded-md font-bold transition-colors duration-200" data-i18n="postComment">Kirim Komentar</button>
-          </form>
-        </div>
-      </div>
-    </div>
-
-    <!-- Notification Modal -->
-    <div id="notificationModal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 z-[100] items-center justify-center p-4">
-      <div class="bg-gray-800 rounded-lg shadow-xl w-full max-w-md p-6 relative">
-        <button id="closeNotificationModal" class="absolute top-4 right-4 text-gray-400 hover:text-white">&times;</button>
-        <h2 id="notificationTitle" class="text-2xl font-bold text-white mb-4">Notifikasi</h2>
-        <div class="space-y-4">
-          <div class="bg-gray-700 p-4 rounded-md">
-            <p id="notificationMessage" class="font-semibold text-white" data-i18n="newModsAvailable">Mod baru tersedia!</p>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Report Modal -->
-    <div id="reportModal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 z-[100] items-center justify-center p-4">
-      <div class="bg-gray-800 rounded-lg shadow-xl w-full max-w-md p-6 relative">
-        <button id="closeReportModal" class="absolute top-4 right-4 text-gray-400 hover:text-white">&times;</button>
-        <h2 class="text-2xl font-bold text-white mb-4" data-i18n="reportMod">Laporkan Mod</h2>
-        <form id="reportForm" class="space-y-4">
-          <div>
-            <label for="reportModId" class="block text-sm font-medium mb-1" data-i18n="reportInstructions">Tempel ID Mod untuk dilaporkan:</label>
-            <input type="text" id="reportModId" required class="w-full p-2 rounded-md bg-gray-600 text-white border border-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
-          </div>
-          <div>
-            <label for="reportReason" class="block text-sm font-medium mb-1">Alasan Laporan</label>
-            <textarea id="reportReason" rows="4" class="w-full p-2 rounded-md bg-gray-600 text-white border border-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Deskripsikan alasan Anda melaporkan mod ini..."></textarea>
-          </div>
-          <button type="submit" class="w-full p-3 bg-red-500 hover:bg-red-600 rounded-md font-bold transition-colors duration-200" data-i18n="submitReport">Kirim Laporan</button>
-        </form>
-        <p id="reportMessage" class="text-center mt-4 text-green-400"></p>
-      </div>
-    </div>
-  </main>
 </body>
 </html>
